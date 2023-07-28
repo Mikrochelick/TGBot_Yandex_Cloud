@@ -118,6 +118,8 @@ stroka1 = {'httpMethod': 'POST', 'headers': {'Accept-Encoding': 'gzip, deflate',
 stroka2 = {'httpMethod': 'POST', 'headers': {'Accept-Encoding': 'gzip, deflate', 'Content-Length': '334', 'Content-Type': 'application/json', 'Host': 'functions.yandexcloud.net', 'Uber-Trace-Id': '1a6730fa27f7feb8:3d1980a296bc89bf:1a6730fa27f7feb8:1', 'X-Forwarded-For': '91.108.6.54', 'X-Real-Remote-Address': '[91.108.6.54]:47402', 'X-Request-Id': '68757cdc-aad3-4b45-b68e-944f6d01ec7e', 'X-Trace-Id': 'c80d5efb-ad32-4a70-a493-d90322410252'}, 'url': '', 'params': {}, 'multiValueParams': {}, 'pathParams': {}, 'multiValueHeaders': {'Accept-Encoding': ['gzip, deflate'], 'Content-Length': ['334'], 'Content-Type': ['application/json'], 'Host': ['functions.yandexcloud.net'], 'Uber-Trace-Id': ['1a6730fa27f7feb8:3d1980a296bc89bf:1a6730fa27f7feb8:1'], 'X-Forwarded-For': ['91.108.6.54'], 'X-Real-Remote-Address': ['[91.108.6.54]:47402'], 'X-Request-Id': ['68757cdc-aad3-4b45-b68e-944f6d01ec7e'], 'X-Trace-Id': ['c80d5efb-ad32-4a70-a493-d90322410252']}, 'queryStringParameters': {}, 'multiValueQueryStringParameters': {}, 'requestContext': {'identity': {'sourceIp': '91.108.6.54', 'userAgent': ''}, 'httpMethod': 'POST', 'requestId': '68757cdc-aad3-4b45-b68e-944f6d01ec7e', 'requestTime': '27/Jul/2023:09:56:56 +0000', 'requestTimeEpoch': 1690451816}, 'body': '{"update_id":970069533,\n"message":{"message_id":192,"from":{"id":611910223,"is_bot":false,"first_name":"Yan","username":"vash_helper","language_code":"ru"},"chat":{"id":611910223,"first_name":"Yan","username":"vash_helper","type":"private"},"date":1690451816,"text":"/start","entities":[{"offset":0,"length":6,"type":"bot_command"}]}}', 'isBase64Encoded': False}
 handler(stroka2, 0)
 
+stroka3 = 'new btanch Yan'
+
 
 
 
