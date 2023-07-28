@@ -5,11 +5,45 @@ import requests
 import os
 import base64
 
+
+def read_file_from_yandex_s3(key):
+
+
+    # Инициализируйте клиента S3
+    yandex_client = boto3.client('s3',
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        region_name='ru-central1',
+        endpoint_url='https://storage.yandexcloud.net'
+    )
+
+    bucket_name = 'tgbot_api'
+
+    try:
+        # Чтение файла из S3-хранилища Yandex
+        response = yandex_client.get_object(Bucket=bucket_name, Key=key)
+
+        # Получение содержимого файла
+        file_content = response['Body'].read()
+
+        # Вернуть содержимое файла
+        return file_content.decode('utf-8')
+
+
+    except Exception as e:
+        print("Возникла ошибка при чтении файла из Yandex Object Storage:")
+        print(e)
+        return {
+            'statusCode': 500,
+            'body': f'Error: {str(e)}'
+        }
+
+
 def save_data_to_yandex_s3(data, object_name):
     # Инициализируем клиент Yandex Object Storage
     yandex_client = boto3.client('s3',
-        aws_access_key_id= 'мой ключ',
-        aws_secret_access_key='мой ключ',
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
         region_name='ru-central1',
         endpoint_url='https://storage.yandexcloud.net'
 
@@ -18,67 +52,83 @@ def save_data_to_yandex_s3(data, object_name):
     try:
         # Преобразуем данные в байтовый формат
         data_bytes = str(data).encode('utf-8')
-        bucket_name = 'teststore'
+        bucket_name = 'tgbot_api'
         # Загружаем данные в Yandex Object Storage
         yandex_client.put_object(Bucket=bucket_name, Key=object_name, Body=data_bytes)
         print(f"Данные успешно сохранены в Yandex Object Storage: s3://{bucket_name}/{object_name}")
     except Exception as e:
-        print("Возникла ошибка при сохранении данных в Yandex Object Storage:")
+        print("Возникла ошибка при сохранении файла в Yandex Object Storage:")
         print(e)
+        return {
+            'statusCode': 500,
+            'body': f'Error: {str(e)}'
+        }
 
 def list_files_in_yandex_s3(prefix):
     # Инициализируйте клиента S3
     yandex_client = boto3.client('s3',
-        aws_access_key_id='мой ключ',
-        aws_secret_access_key='мой ключ',
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
         region_name='ru-central1',
         endpoint_url='https://storage.yandexcloud.net'
     )
-    bucket_name = 'teststore'
+
 
     try:
+        bucket_name = 'tgbot_api'
         # Получение списка объектов (файлов) в указанной директории
-        response = yandex_client.list_objects_v2(Bucket=bucket_name, Prefix='сообщения')
+        response = yandex_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+
 
         # Список файлов
         file_list = [obj['Key'] for obj in response['Contents']]
 
         # Вернуть список файлов (в данном примере просто выводим его)
-        print(file_list)
+        #print(file_list)
 
-        return {
-            'statusCode': 200,
-            'body': 'File list retrieved successfully.'
-        }
+        return file_list
+
     except Exception as e:
+        print("Возникла ошибка при чтении списка в Yandex Object Storage:")
+        print(e)
         return {
             'statusCode': 500,
             'body': f'Error: {str(e)}'
         }
 
 def process_event(object):
+    try:
+        # Проверка кодировки base64
         if is_base64_encoded(object.get('body')):
             body = base64.b64decode(object.get('body')).decode('utf-8')
 
         body = json.loads(object['body'])
         if body.get('message'):
-            # save_data_to_yandex_cloud(object, f'сообщения/{generate_apikey()}.txt')
+
             user_name = body.get('message').get('from').get('username')
             chat_id = body.get('message').get('chat').get('id')
             text = body.get('message').get('text')
-            if text == '/start':
-                #if chat_id in list_files_in_yandex_s3():   дописать
-                #user_api_key = generate_apikey()
-                send_message()
+            save_data_to_yandex_s3(object, f'сообщения/{generate_apikey()}.txt')
+            list_files_in_s3 = list_files_in_yandex_s3('сообщения')
+            # Проверяем, есть ли у данного пользователя API_KEY
+            if text == '/start' and f'{chat_id}.txt' not in list_files_in_s3('userwithapikey'):
+                user_api_key = generate_apikey()
+                object['user_api_key'] = f'{user_api_key}'
+                save_data_to_yandex_s3(object, f'userwithapikey/{chat_id}.txt')
+                send_message(f'Вам присвоен API ключ:\n{user_api_key}')
+            if text == '/start' and f'{chat_id}.txt' in list_files_in_s3('userwithapikey'):
+                user_api_key = read_file_from_yandex_s3(f'{chat_id}.txt')['user_api_key']
+                send_message(f'У вас уже есть API ключ, вот он:\n {user_api_key}')
 
-            print(1)
+            else:
+                send_message(f'Вы написали: {text}\nПока что я только умею выдавать или показывать уже выданные API ключи')
         if body.get('my_chat_member'):
-            print('не команда и не сообщение')
-
+            save_data_to_yandex_s3(object, f'mychatmember/{generate_apikey()}.txt')
         else:
-            print(f'неизвестный запрос:\n{object}')
-
-        list_files_in_yandex_s3()
+            save_data_to_yandex_s3(object, f'другиесобытия/{generate_apikey()}.txt')
+    except:
+        save_data_to_yandex_s3(object, f'мусорсошибками/{generate_apikey()}.txt')
+        print('В Body нет JSON структуры')
 
 
 
