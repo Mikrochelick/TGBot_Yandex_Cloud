@@ -108,20 +108,20 @@ def process_event(object):
             user_name = body.get('message').get('from').get('username')
             chat_id = body.get('message').get('chat').get('id')
             text = body.get('message').get('text')
-            save_data_to_yandex_s3(object, f'сообщения/{generate_apikey()}.txt')
-            list_files_in_s3 = list_files_in_yandex_s3('сообщения')
             # Проверяем, есть ли у данного пользователя API_KEY
-            if text == '/start' and f'{chat_id}.txt' not in list_files_in_s3('userwithapikey'):
+            # Если его нет, выдаем ключ и сохраняем соотвествие в Object storage
+            if text == '/start' and f'{chat_id}.txt' not in list_files_in_yandex_s3('userwithapikey'):
                 user_api_key = generate_apikey()
                 object['user_api_key'] = f'{user_api_key}'
                 save_data_to_yandex_s3(object, f'userwithapikey/{chat_id}.txt')
                 send_message(f'Вам присвоен API ключ:\n{user_api_key}')
-            if text == '/start' and f'{chat_id}.txt' in list_files_in_s3('userwithapikey'):
+            # Если есть, показываем его
+            if text == '/start' and f'{chat_id}.txt' in list_files_in_yandex_s3('userwithapikey'):
                 user_api_key = read_file_from_yandex_s3(f'{chat_id}.txt')['user_api_key']
                 send_message(f'У вас уже есть API ключ, вот он:\n {user_api_key}')
-
             else:
                 send_message(f'Вы написали: {text}\nПока что я только умею выдавать или показывать уже выданные API ключи')
+        # Другие события не связанные с отправкой каких либо сообщений
         if body.get('my_chat_member'):
             save_data_to_yandex_s3(object, f'mychatmember/{generate_apikey()}.txt')
         else:
