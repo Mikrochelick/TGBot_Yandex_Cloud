@@ -7,29 +7,23 @@ import base64
 
 
 def read_file_from_yandex_s3(key):
-
-
     # Инициализируйте клиента S3
     yandex_client = boto3.client('s3',
-        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        aws_access_key_id='YCAJEcaWO8SZGt98eg6fLEJZ5', #os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key='YCMF7y3ruqPBYLw3xVS2oNKyGJAghyXO1ym6ZqKx', #os.environ['AWS_SECRET_ACCESS_KEY'],
         region_name='ru-central1',
         endpoint_url='https://storage.yandexcloud.net'
     )
-
-    bucket_name = 'tgbot_api'
-
+    bucket_name = 'storageusersapi'
     try:
         # Чтение файла из S3-хранилища Yandex
         response = yandex_client.get_object(Bucket=bucket_name, Key=key)
-
         # Получение содержимого файла
         file_content = response['Body'].read()
-
+        file_content = file_content.decode('utf-8')
+        file_content = json.loads(file_content)
         # Вернуть содержимое файла
-        return file_content.decode('utf-8')
-
-
+        return file_content
     except Exception as e:
         print("Возникла ошибка при чтении файла из Yandex Object Storage:")
         print(e)
@@ -42,17 +36,15 @@ def read_file_from_yandex_s3(key):
 def save_data_to_yandex_s3(data, object_name):
     # Инициализируем клиент Yandex Object Storage
     yandex_client = boto3.client('s3',
-        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        aws_access_key_id='YCAJEcaWO8SZGt98eg6fLEJZ5', #os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key='YCMF7y3ruqPBYLw3xVS2oNKyGJAghyXO1ym6ZqKx', #os.environ['AWS_SECRET_ACCESS_KEY'],
         region_name='ru-central1',
         endpoint_url='https://storage.yandexcloud.net'
-
     )
-
     try:
         # Преобразуем данные в байтовый формат
-        data_bytes = str(data).encode('utf-8')
-        bucket_name = 'tgbot_api'
+        data_bytes = json.dumps(data) #.encode('utf-8')
+        bucket_name = 'storageusersapi'
         # Загружаем данные в Yandex Object Storage
         yandex_client.put_object(Bucket=bucket_name, Key=object_name, Body=data_bytes)
         print(f"Данные успешно сохранены в Yandex Object Storage: s3://{bucket_name}/{object_name}")
@@ -64,28 +56,23 @@ def save_data_to_yandex_s3(data, object_name):
             'body': f'Error: {str(e)}'
         }
 
+
 def list_files_in_yandex_s3(prefix):
     # Инициализируйте клиента S3
     yandex_client = boto3.client('s3',
-        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        aws_access_key_id='YCAJEcaWO8SZGt98eg6fLEJZ5', #os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key='YCMF7y3ruqPBYLw3xVS2oNKyGJAghyXO1ym6ZqKx', #os.environ['AWS_SECRET_ACCESS_KEY'],
         region_name='ru-central1',
         endpoint_url='https://storage.yandexcloud.net'
     )
-
-
     try:
-        bucket_name = 'tgbot_api'
+        bucket_name = 'storageusersapi'
         # Получение списка объектов (файлов) в указанной директории
         response = yandex_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
-
-
         # Список файлов
         file_list = [obj['Key'] for obj in response['Contents']]
-
         # Вернуть список файлов (в данном примере просто выводим его)
         #print(file_list)
-
         return file_list
 
     except Exception as e:
@@ -95,6 +82,7 @@ def list_files_in_yandex_s3(prefix):
             'statusCode': 500,
             'body': f'Error: {str(e)}'
         }
+
 
 def process_event(object):
     try:
@@ -110,17 +98,20 @@ def process_event(object):
             text = body.get('message').get('text')
             # Проверяем, есть ли у данного пользователя API_KEY
             # Если его нет, выдаем ключ и сохраняем соотвествие в Object storage
-            if text == '/start' and f'{chat_id}.txt' not in list_files_in_yandex_s3('userwithapikey'):
+            #spisok = list_files_in_yandex_s3('userwithapikey')
+            # Если есть, показываем его
+            if text == '/start' and f'userwithapikey/{chat_id}.txt' in list_files_in_yandex_s3('userwithapikey'):
+                user_api_key = read_file_from_yandex_s3(f'userwithapikey/{chat_id}.txt').get('user_api_key')
+                send_message(f'У вас уже есть API ключ, вот он:\n {user_api_key}', chat_id)
+                return 0
+            if text == '/start' and (f'userwithapikey/{chat_id}.txt' not in list_files_in_yandex_s3('userwithapikey')):
                 user_api_key = generate_apikey()
                 object['user_api_key'] = f'{user_api_key}'
                 save_data_to_yandex_s3(object, f'userwithapikey/{chat_id}.txt')
-                send_message(f'Вам присвоен API ключ:\n{user_api_key}')
-            # Если есть, показываем его
-            if text == '/start' and f'{chat_id}.txt' in list_files_in_yandex_s3('userwithapikey'):
-                user_api_key = read_file_from_yandex_s3(f'{chat_id}.txt')['user_api_key']
-                send_message(f'У вас уже есть API ключ, вот он:\n {user_api_key}')
+                send_message(f'Вам присвоен API ключ:\n{user_api_key}', chat_id)
+                return 0
             else:
-                send_message(f'Вы написали: {text}\nПока что я только умею выдавать или показывать уже выданные API ключи')
+                send_message(f'Вы написали: {text}\nПока что я только умею выдавать или показывать уже выданные API ключи', chat_id)
         # Другие события не связанные с отправкой каких либо сообщений
         if body.get('my_chat_member'):
             save_data_to_yandex_s3(object, f'mychatmember/{generate_apikey()}.txt')
@@ -131,12 +122,11 @@ def process_event(object):
         print('В Body нет JSON структуры')
 
 
-
 def generate_apikey(): return uuid.uuid4()
 
 
 def send_message(text, chat_id):
-    url = f'https://api.telegram.org/bot%s/sendMessage' % os.environ['BOT_TOKEN']
+    url = f'https://api.telegram.org/bot6327342146:AAGxx9VBIV3aI5xr1Zxai-0Nf7tXGFl-Xlks/sendMessage' # % os.environ['BOT_TOKEN']
     data = {'chat_id': chat_id, 'text': text}
     response = requests.post(url, data=data)
     return response
