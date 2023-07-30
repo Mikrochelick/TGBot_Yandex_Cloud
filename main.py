@@ -25,12 +25,9 @@ def read_file_from_yandex_s3(key):
         # Вернуть содержимое файла
         return file_content
     except Exception as e:
-        print("Возникла ошибка при чтении файла из Yandex Object Storage:")
+        print(f"Возникла ошибка при чтении файла из Yandex Object Storage: {key}")
         print(e)
-        return {
-            'statusCode': 500,
-            'body': f'Error: {str(e)}'
-        }
+        return None
 
 
 def save_data_to_yandex_s3(data, object_name):
@@ -60,7 +57,7 @@ def save_data_to_yandex_s3(data, object_name):
 def list_files_in_yandex_s3(prefix):
     # Инициализируйте клиента S3
     yandex_client = boto3.client('s3',
-        aws_access_key_id='os.environ['AWS_ACCESS_KEY_ID'],
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
         aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
         region_name='ru-central1',
         endpoint_url='https://storage.yandexcloud.net'
@@ -93,23 +90,27 @@ def process_event(object):
         if object.get('queryStringParameters').get('APIKEY') != None and object.get('httpMethod') == 'POST':
             api_key = object.get('queryStringParameters').get('APIKEY')
             chat_id = read_file_from_yandex_s3(f'api_and_chatid/{api_key}.txt')
+            if chat_id == None: return 'Wrong APIKEY'
             send_message(body, chat_id)
-            return None
+            return 'Ok'
+
         # Обработка GET от стороннего приложения с API в запросе
         if object.get('queryStringParameters').get('APIKEY') != None and object.get('httpMethod') == 'GET':
             api_key = object.get('queryStringParameters').get('APIKEY')
             chat_id = read_file_from_yandex_s3(f'api_and_chatid/{api_key}.txt')
-            body = read_file_from_yandex_s3(list_oldest_file_in_folder(f'history_massage/{chat_id}'))
-            send_message(body, chat_id)
-            delete_oldest_file_in_folder(f'history_message/{chat_id}')
-            return None
+            if chat_id == None: return 'Wrong APIKEY'
+            oldest_file = list_oldest_file_in_folder(f'history_massage/{chat_id}')
+            body = read_file_from_yandex_s3(oldest_file)
+            delete_oldest_file_in_folder(oldest_file)
+            return body
+
         body = json.loads(object['body'])
         # Другие события не связанные с отправкой каких либо сообщений
         if body.get('my_chat_member'):
             save_data_to_yandex_s3(object, f'mychatmember/{generate_apikey()}.txt')
+            return 'Ok'
 
         if body.get('message'):
-
             user_name = body.get('message').get('from').get('username')
             chat_id = body.get('message').get('chat').get('id')
             text = body.get('message').get('text')
@@ -124,9 +125,9 @@ def process_event(object):
                     У вас уже есть API ключ, вот он:
                     {user_api_key}
                     Ваше приложение может отправлять в этот чат текст: 
-                    requests.post(url+"?APIKEY=ghsdjkfghdksfgkjdf", data="text")
+                    requests.post(url+"?APIKEY={user_api_key}", data="text")
                     а также получать реплики пользователя (или пустую строку в ответе):
-                    requests.get(url+"?APIKEY=ghsdjkfghdksfgkjdf")
+                    requests.get(url+"?APIKEY={user_api_key}")
                     '''
                     , chat_id)
 
@@ -140,17 +141,19 @@ def process_event(object):
                     Вам выдан API ключ, вот он:
                     {user_api_key}
                     Теперь ваше приложение может отправлять в этот чат текст: 
-                    requests.post(url+"?APIKEY=вашAPIключ", data="text")
+                    requests.post(url+"?APIKEY={user_api_key}", data="text")
                     а также получать реплики пользователя (или пустую строку в ответе):
-                    requests.get(url+"?APIKEY=APIKEY=вашAPIключ")
+                    requests.get(url+"?APIKEY=APIKEY={user_api_key}")
                     '''
                     , chat_id)
 
             else:
                 send_message(f'Вы написали: {text}\nПока что я только умею выдавать или показывать уже выданные API ключи', chat_id)
                 save_data_to_yandex_s3(text, f'history_message/{chat_id}/{str(generate_apikey()).txt}')
+                return 'Ok'
         else:
             save_data_to_yandex_s3(object, f'другиесобытия/{generate_apikey()}.txt')
+            return 'Ok'
 
     except:
         save_data_to_yandex_s3(object, f'мусорсошибками/{generate_apikey()}.txt')
